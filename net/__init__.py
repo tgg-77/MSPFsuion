@@ -3,7 +3,7 @@ import os
 from .densefuse import DenseFuse_net
 from .IFCNN import myIFCNN
 from .MSPFusion import MSPFusion
-from .MSPFusion_train import MSPFusion
+from .MSPFusion_train import MSPFusion_train
 
 def model_generator(method, pretrained_model_path=None):
     if method == 'densefuse':
@@ -13,7 +13,7 @@ def model_generator(method, pretrained_model_path=None):
     elif method == 'MSPFusion':
         model = MSPFusion()
     elif method == 'MSPFusion_train':
-        model = MSPFusion()
+        model = MSPFusion_train()
     else:
         print(f'Method {method} is not defined !!!!')
     if pretrained_model_path is not None:
