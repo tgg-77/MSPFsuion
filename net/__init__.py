@@ -1,22 +1,18 @@
 import torch
 import os
 from .densefuse import DenseFuse_net
-from .HSCNN_Plus import HSCNN_Plus
-from .fusion_layer import Fusion_network
 from .IFCNN import myIFCNN
 from .MSPFusion import MSPFusion
-
+from .MSPFusion_train import MSPFusion
 
 def model_generator(method, pretrained_model_path=None):
     if method == 'densefuse':
         model = DenseFuse_net(input_nc=1, output_nc=1).cuda()
-    elif method == 'hscnn':
-        model = HSCNN_Plus().cuda()
-    elif method == 'fusion_layer':
-        model = Fusion_network([64], 'res').cuda()
     elif method == 'ifcnn':
         model = myIFCNN(fuse_scheme=0)
     elif method == 'MSPFusion':
+        model = MSPFusion()
+    elif method == 'MSPFusion_train':
         model = MSPFusion()
     else:
         print(f'Method {method} is not defined !!!!')
