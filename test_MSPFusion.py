@@ -1,25 +1,13 @@
 # test phase
-import torch
 from torch.autograd import Variable
 from net import *
 import utils
 from args_fusion import args
-import numpy as np
-import time
-import cv2
-import os
-import scipy.io as io
-import pytorch_msssim
 from evaluation_sp import *
 import time
 import os
-from torch.utils.data import Dataset
-import random
 import cv2
-import h5py
-from torch.utils.data import DataLoader
 import scipy.io as sio
-import matplotlib.pyplot as plt
 
 
 # load a pre-trained model
