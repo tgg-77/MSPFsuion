@@ -22,35 +22,38 @@ import scipy.io as sio
 import matplotlib.pyplot as plt
 
 
+# load a pre-trained model
 def load_model(path):
-    print(path)
+    print(f"Loading model from: {path}")
     model = model_generator(method='MSPFusion')
-    # nest_model = DenseFuse_net(input_nc, output_nc)
-    nest_model = model
-    nest_model.load_state_dict(torch.load(path))
+    model.load_state_dict(torch.load(path))
 
-    para = sum([np.prod(list(p.size())) for p in nest_model.parameters()])
+    # Calculate and display model parameters
+    para = sum([np.prod(list(p.size())) for p in model.parameters()])
     type_size = 4
-    print('Model {} : params: {:4f}M'.format(nest_model._get_name(), para * type_size / 1000 / 1000))
+    print('Model {} : params: {:4f}M'.format(model._get_name(), para * type_size / 1000 / 1000))
 
-    nest_model.eval()
-    nest_model.cuda()
+    model.eval()
+    model.cuda()
 
-    return nest_model
+    return model
 
 
+# Generate a fused image from multiple input images
 def _generate_fusion_image(model, h1, h2, h3, h4, h5, dolp):
-    # encoder
-    w_list = model.fusion_layer(h1, h2, h3, h4, h5, dolp)
+    # Encoder step: extract features from inputs
     en_1 = model.encoder(h1)
     en_2 = model.encoder(h2)
     en_3 = model.encoder(h3)
     en_4 = model.encoder(h4)
     en_5 = model.encoder(h5)
     en_d = model.encoder(dolp)
-    # fusion
+
+    # Fusion step: combine features using a fusion layer
+    w_list = model.fusion_layer(h1, h2, h3, h4, h5, dolp)
     f = model.fusion(en_1, en_2, en_3, en_4, en_5, en_d, w_list)
-    # decoder
+
+    # Decoder step: generate the final fused image
     img_fusion = model.decoder(f)
     return [img_fusion]
 
@@ -68,39 +71,25 @@ def vision_features(feature_maps, img_type):
             # save images
             utils.save_image_test(map, output_path)
 
+
 def img_pr(img_nol):
     img_nol = img_nol.cpu().data[0].numpy()
     img_nol = img_nol.transpose(1, 2, 0)
-    # img_nol = (img_nol - np.min(img_nol)) / (np.max(img_nol) - np.min(img_nol))
-    # img_nol = img_nol * 255
     return img_nol
 
 
-
 def main():
-
-    # run demo
-    test_path = "dataset"
-    network_type = 'MSPFusion'
-    fusion_type = 'auto'  # auto, fusion_layer, fusion_all
-    strategy_type_list = ['addition',
-                          'attention_weight']  # addition, attention_weight, attention_enhance, adain_fusion, channel_fusion, saliency_mask
+    # Metrics initialization
     en, ag, sd, sf, mi, ssim, ms_ssim = 0, 0, 0, 0, 0, 0, 0
     error = 0
     num = 34
-    for q in range(1):
+    for q in range(34):
         output_path = './output/%d/' % q
-        # output_path = 'pol/'
-        strategy_type = strategy_type_list[0]
         hyper_path = 'NWPUSPI/%d.mat' % q
-        # hyper_path = '/media/jin/b/dataset/NWPUSPI/mat_v2/%d.mat' % q
         rgb = sio.loadmat(hyper_path)['input']
         hsi = sio.loadmat(hyper_path)['label']
-
-        if os.path.exists(output_path) is False:
-            os.makedirs(output_path)
-
-        model_path = './model/models_trans_l1_nobias_noresize.model'
+        os.makedirs(output_path, exist_ok=True)
+        model_path = './model/MSPFusion.model'
 
         h = np.zeros((4, 696, 697, 32), dtype=np.float32)
         r = np.zeros((4, 696, 697, 3), dtype=np.float32)
@@ -109,20 +98,10 @@ def main():
             r[i, :, :, :] = hsi[:, :, i * 3:(i + 1) * 3]
 
         with torch.no_grad():
-            print('NUMBER ----- ' + str(q))
-            # print('SSIM weight ----- ' + args.ssim_path[2])
-            ssim_weight_str = args.ssim_path[2]
+            print(f"Processing sample {q}")
             model = load_model(model_path)
-            out_path = 'NWPUSP'
-
-
-            if not os.path.exists(out_path):
-                os.makedirs(out_path)
-
             time_list = []
             for i in range(1):
-                index = i + 1
-
                 h_raw = h
                 h = h.astype(np.float32)
                 h = np.sum(h, axis=0) / 2
@@ -132,11 +111,7 @@ def main():
                 if args.cuda:
                     h = h.cuda()
 
-                h1 = h[:, :, 0]
-                h2 = h[:, :, 1]
-                h3 = h[:, :, 2]
-                h4 = h[:, :, 3]
-                h5 = h[:, :, 4]
+                h1, h2, h3, h4, h5 = [h[:, :, i] for i in range(5)]
                 r0 = np.mean(h_raw[0, :, :, :], axis=2)*255
                 r1 = np.mean(h_raw[1, :, :, :], axis=2)*255
                 r2 = np.mean(h_raw[2, :, :, :], axis=2)*255
@@ -147,68 +122,36 @@ def main():
                 cv2.imwrite(output_path + 'd2.png', r2)
                 cv2.imwrite(output_path + 'd3.png', r3)
 
+                # Calculate DoLP
                 s0 = (r0 + r1 + r2 + r3) / 2
                 s1 = r0 - r2
                 s2 = r1 - r3
                 dolp = np.sqrt(s1 * s1 + s2 * s2) / (s0)
                 dolp[np.isnan(dolp)] = 0
-
-
-
                 dolp = ((dolp - dolp.min()) / (dolp.max() - dolp.min()))
                 dolp = torch.tensor(dolp*255)
 
                 if args.cuda:
                     dolp = dolp.cuda()
-                h1 = h1.unsqueeze(0).unsqueeze(0)
-                h2 = h2.unsqueeze(0).unsqueeze(0)
-                h3 = h3.unsqueeze(0).unsqueeze(0)
-                h4 = h4.unsqueeze(0).unsqueeze(0)
-                h5 = h5.unsqueeze(0).unsqueeze(0)
+                h1, h2, h3, h4, h5, dolp = [x.unsqueeze(0).unsqueeze(0) for x in [h1, h2, h3, h4, h5, dolp]]
                 dolp = dolp.unsqueeze(0).unsqueeze(0)
-                h1 = Variable(h1, requires_grad=False)
-                h2 = Variable(h2, requires_grad=False)
-                h3 = Variable(h3, requires_grad=False)
-                h4 = Variable(h4, requires_grad=False)
-                h5 = Variable(h5, requires_grad=False)
-                dolp = Variable(dolp, requires_grad=False)
-
+                h1, h2, h3, h4, h5, dolp = [Variable(x, requires_grad=False) for x in [h1, h2, h3, h4, h5, dolp]]
 
                 output_path_root = output_path
                 temp_time = time.time()
                 img_fusion = _generate_fusion_image(model, h1, h2, h3, h4, h5, dolp)
                 temp_time_gap = time.time() - temp_time
                 time_list.append(temp_time_gap)
-                # img_fusion = _generate_fusion_image(model, strategy_type, ir_img, vis_img)
-                ############################ multi outputs ##############################################
-                file_name = 'fusion_' + fusion_type + '_' + str(
-                    index) + '_network_' + network_type + '_' + strategy_type + '_' + ssim_weight_str + '.png'
 
-
+                # Save output images
                 img_nol = img_fusion[0].cpu().data[0].numpy()
-
                 img_nol = img_nol.transpose(1, 2, 0)
-                # print(np.max(img_nol))
                 img_nol = (img_nol-np.min(img_nol))/(np.max(img_nol)-np.min(img_nol))
                 img_nol = img_nol * 255
-                h1 = img_pr(h1)
-                h2 = img_pr(h2)
-                h3 = img_pr(h3)
-                h4 = img_pr(h4)
-                h5 = img_pr(h5)
-                dolp = img_pr(dolp)
-                if args.cuda:
-                    img = img_fusion[0].cpu().clamp(0, 255).data[0].numpy()
-                else:
-                    img = img_fusion[0].clamp(0, 255).data[0].numpy()
-
                 cv2.imwrite(output_path_root + 'f.png', img_nol)
-                cv2.imwrite(output_path_root + '0.png', h1)
-                cv2.imwrite(output_path_root + '1.png', h2)
-                cv2.imwrite(output_path_root + '2.png', h3)
-                cv2.imwrite(output_path_root + '3.png', h4)
-                cv2.imwrite(output_path_root + '4.png', h5)
-                cv2.imwrite(output_path_root + 'd.png', dolp)
+                for m, img in enumerate([h1, h2, h3, h4, h5, dolp]):
+                    img_pr_img = img_pr(img)
+                    cv2.imwrite(f'{output_path}{m}.png', img_pr_img)
 
                 h1 = h1.squeeze().astype(np.uint8)
                 h2 = h2.squeeze().astype(np.uint8)
@@ -218,7 +161,7 @@ def main():
                 dolp = dolp.squeeze().astype(np.uint8)
                 img_nol = img_nol.squeeze().astype(np.uint8)
 
-
+                # Compute evaluation metrics
                 sd_ = SD(img_nol)
                 en_ = Entropy(img_nol)
                 ag_ = avgGradient(img_nol)
@@ -260,6 +203,6 @@ def main():
     print('msssim:', ms_ssim / (num-error))
     print('MI:', mi / num)
 
-if __name__ == '__main__':
 
+if __name__ == '__main__':
     main()
