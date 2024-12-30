@@ -1,14 +1,7 @@
-# test phase
-import torch
-from torch.autograd import Variable
-import numpy as np
-import time
-import cv2
-import os
-import scipy.io as io
-import pytorch_msssim
-import time
+# Generate qualitative evaluation results
 
+import numpy as np
+import cv2
 
 
 for i in range(17, 18):
