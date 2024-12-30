@@ -11,7 +11,7 @@ import torch
 from torch.optim import Adam
 from torch.autograd import Variable
 import utils
-from MSPFusion_train import MSPFusion
+from net import *
 from args_fusion import args
 import pytorch_msssim
 
@@ -32,7 +32,7 @@ def main():
 def train(i, original_imgs_path):
 	# Set batch size and initialize model
 	batch_size = args.batch_size
-	MSPFusion_model = MSPFusion()
+	MSPFusion_model = model_generator(method='MSPFusion_train')
 
 	# Resume from pre-trained model if exists
 	if args.resume is not None:
