@@ -1,8 +1,7 @@
-# Training DenseFuse network
+# Training MSPFusion network
 # auto-encoder
 
 import os
-import sys
 import time
 import numpy as np
 from tqdm import tqdm, trange
@@ -15,29 +14,30 @@ import utils
 from MSPFusion_train import MSPFusion
 from args_fusion import args
 import pytorch_msssim
-import torch.nn.functional as F
 
 
 def main():
-	os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+	# Set GPU device
+	os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda
+
+	# Load and shuffle image dataset
 	original_imgs_path = utils.list_images(args.dataset)
 	train_num = 80000
 	original_imgs_path = original_imgs_path[:train_num]
 	random.shuffle(original_imgs_path)
-	for i in range(1):
-		# i = 3
+	for i in range(1, 2):  # Weight of loss function
 		train(i, original_imgs_path)
 
 
 def train(i, original_imgs_path):
-
+	# Set batch size and initialize model
 	batch_size = args.batch_size
 	MSPFusion_model = MSPFusion()
 
+	# Resume from pre-trained model if exists
 	if args.resume is not None:
 		print('Resuming, initializing using weight from {}.'.format(args.resume))
 		MSPFusion_model.load_state_dict(torch.load(args.resume))
-	print(MSPFusion_model)
 	optimizer = Adam(MSPFusion_model.parameters(), args.lr)
 	L2_loss = torch.nn.MSELoss()
 	ssim_loss = pytorch_msssim.msssim
@@ -57,12 +57,8 @@ def train(i, original_imgs_path):
 	if os.path.exists(temp_path_loss) is False:
 		os.makedirs(temp_path_loss)
 
-	Loss_pixel = []
-	Loss_ssim = []
-	Loss_l1 = []
-	Loss_all = []
-	all_ssim_loss = 0.
-	all_pixel_loss = 0.
+	Loss_pixel, Loss_ssim, Loss_all = [], [], []
+	all_ssim_loss, all_pixel_loss = 0., 0.
 	for e in tbar:
 		print('Epoch %d.....' % e)
 		# load training database
@@ -76,10 +72,9 @@ def train(i, original_imgs_path):
 			count += 1
 			optimizer.zero_grad()
 			img = Variable(img/255, requires_grad=False)
-			# if args.cuda:
-			img = img.cuda()
-			MSPFusion_model.cuda()
-			# print(img.dtype)
+			if args.cuda:
+				img = img.cuda()
+				MSPFusion_model.cuda()
 			# get fusion image
 			# encoder
 			en = MSPFusion_model.encoder(img)
@@ -89,7 +84,6 @@ def train(i, original_imgs_path):
 			x = Variable(img.data.clone(), requires_grad=False)
 			outputs = [outputs]
 			ssim_loss_value = 0.
-			pixel_loss_value = 0.
 			L2_loss_value = 0.
 
 			for output in outputs:
@@ -105,7 +99,6 @@ def train(i, original_imgs_path):
 			optimizer.step()
 
 			all_ssim_loss += ssim_loss_value.item()
-
 			all_pixel_loss += L2_loss_value.item()
 			if (batch + 1) % args.log_interval == 0:
 				mesg = "{}\tEpoch {}:\t[{}/{}]\t pixel loss: {:.6f}\t ssim loss: {:.6f}\t total: {:.6f}".format(

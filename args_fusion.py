@@ -1,7 +1,7 @@
 
 class args():
 	pretrained_model_path = None
-	method = 'TDFusion'
+	method = 'MSPFusion'
 
 	# training args
 	epochs = 10 #"number of training epochs, default is 2"
