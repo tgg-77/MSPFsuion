@@ -1,4 +1,3 @@
-import numpy as np
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
@@ -313,9 +312,9 @@ class MST_decoder(nn.Module):
 
         return fea
 
-class MSPFusion(nn.Module):
+class MSPFusion_train(nn.Module):
     def __init__(self, in_channels=1, out_channels=1, n_feat=32, stage=2):
-        super(MSPFusion, self).__init__()
+        super(MSPFusion_train, self).__init__()
         self.stage = stage
         self.encoder_model = MST_encoder(dim=16, stage=self.stage, num_blocks=[1, 1, 1])
         self.decoder_model = MST_decoder(dim=16, stage=self.stage, num_blocks=[1, 1, 1])
