@@ -1,20 +1,11 @@
-import math
-import numpy as np
 import cv2
 import torch
-import pandas as pd
-from skimage import measure,metrics
+from skimage import metrics
 from scipy import signal
-from MSSSIM import msssim
 import math
-from PIL import Image
 from skimage.measure import shannon_entropy
-from pytorch_msssim import ssim, ms_ssim
-from sklearn.metrics.cluster import mutual_info_score
-from tqdm import trange
-# from MEF_MS_SSIM.MS_SSIMc import MS_SSIMc
 from scipy.ndimage import convolve
-from scipy.ndimage import filters
+
 
 def QG(fuse, imgs):
     """
