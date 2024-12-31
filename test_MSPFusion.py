@@ -8,6 +8,7 @@ import time
 import os
 import cv2
 import scipy.io as sio
+from ISSC import *
 
 
 # load a pre-trained model
@@ -93,7 +94,16 @@ def main():
                 h_raw = h
                 h = h.astype(np.float32)
                 h = np.sum(h, axis=0) / 2
-                h = h[:, :, [5, 10, 15, 20, 25]]
+
+                # Band selection
+                n_row, n_column, n_band = h.shape
+                img = minmax_scale(h.reshape(n_row * n_column, n_band)).reshape((n_row, n_column, n_band))
+                x_input = img.reshape(n_row * n_column, n_band)
+                num_class = 5
+                ISSC = ISSC_HSI(n_band=num_class)
+                bands, bands_list = ISSC.predict(x_input)
+
+                h = h[:, :, bands_list]
                 h = (h - h.min()) / (h.max() - h.min())
                 h = torch.tensor(h*255)
                 if args.cuda:
@@ -160,15 +170,11 @@ def main():
                     h2, img_nol) + metrics.structural_similarity(h3, img_nol) + metrics.structural_similarity(h4,
                                                                                                         img_nol)) / 5 + metrics.structural_similarity(
                     dolp, img_nol)) / 2
-                ms_ssim_ = ((msssim(h5, img_nol) + msssim(h1, img_nol) + msssim(h2, img_nol) + msssim(h3, img_nol) + msssim(h4,
-                                                                                                                img_nol)) / 5 + msssim(
-                    dolp, img_nol)) / 2
                 print('entropy:', en_)
                 print('AG:', ag_)
                 print('MI:', mi_)
                 print('SD:', sd_)
                 print('ssim:', ssim_, metrics.structural_similarity(dolp, img_nol))
-                print('msssim:', ms_ssim_, msssim(dolp, img_nol))
                 print('sf:', sf_)
 
                 sd = sd + sd_
@@ -177,10 +183,7 @@ def main():
                 mi = mi + mi_
                 sf = sf + sf_
                 ssim = ssim + ssim_
-                if not np.isnan(ms_ssim_):
-                    ms_ssim = ms_ssim + ms_ssim_
-                else:
-                    error += 1
+
 
         print('Done......')
     print('SD:', sd / num)
@@ -188,7 +191,6 @@ def main():
     print('AG:', ag / num)
     print('ssim:', ssim / num)
     print('sf:', sf / num)
-    print('msssim:', ms_ssim / (num-error))
     print('MI:', mi / num)
 
 
